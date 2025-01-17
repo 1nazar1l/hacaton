@@ -55,7 +55,7 @@ def get_correct_sorted_chapters(user_string, chapters):
 
     return sorted_chapters
 
-def find_manga_on_page(url, text_to_find):
+def find_manga_on_page(url, text_to_find, manga):
     i = 9
     found = False
 
@@ -70,29 +70,51 @@ def find_manga_on_page(url, text_to_find):
         
         for card in cards:
             if text_to_find in card.text:  
-                aa = card.parent
-                href = aa["href"].split("/")[-1]
-                print(card.text)
-                print(href)
+                a = card.parent
+                href = a["href"].split("/")[-1]
+                manga.append(card.text)
+                manga.append(href)
                 found = True  
                 break  
 
+def find_last_chapter(url):
+    response = requests.get(url)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, 'html.parser')
+    href = soup.find_all("h2")[2].parent["href"]
+    last_chapter = href.split("/")[-1].split("-")[-1]
+    return int(last_chapter)
+
 def main():
-    # user_string = "1daf.f2,23:2,24ss:, ,0"
+    user_string = "1:12"
     # user_string = input("Введите значения: ")
-    # chapters = []
-    # sorted_chapters = get_correct_sorted_chapters(user_string, chapters)
+    chapters = []
+    sorted_chapters_counter = get_correct_sorted_chapters(user_string, chapters)
+    if len(sorted_chapters_counter) == 0:
+        print("Перепроверьте главы которые вы написали для скачивания.")
     # print(sorted_chapters)
 
     current_time1 = datetime.datetime.now().time()
-    print(current_time1) 
-
-    url = f"https://mangapoisk.live/manga"
+    # print(current_time1) 
+    manga = []
+    url = "https://mangapoisk.live/manga"
     text_to_find = "Жрец порчи" 
-    find_manga_on_page(url, text_to_find)  
-
+    find_manga_on_page(url, text_to_find, manga)  
     current_time2 = datetime.datetime.now().time()
-    print(current_time2) 
+    # print(current_time2) 
+
+    url = f"https://mangapoisk.live/manga/{manga[1]}"
+    last_chapter = find_last_chapter(url)
+    # print(last_chapter)
+
+    suitable_chapters_counter = []
+    for number in sorted_chapters_counter:
+        if number <= last_chapter:
+            suitable_chapters_counter.append(number)
+    print(suitable_chapters_counter)
+    # url = f"https://mangapoisk.live/manga/{manga[1]}/chapter/1-1"
+    # print(url)
+
 
 if __name__ == "__main__":
     main()
