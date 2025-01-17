@@ -2,6 +2,9 @@ import requests
 from bs4 import BeautifulSoup
 import datetime
 
+import os
+
+
 def get_correct_number(number, range=True):
     for el in number:
             if el in "1234567890":
@@ -111,10 +114,33 @@ def main():
     for number in sorted_chapters_counter:
         if number <= last_chapter:
             suitable_chapters_counter.append(number)
-    print(suitable_chapters_counter)
-    # url = f"https://mangapoisk.live/manga/{manga[1]}/chapter/1-1"
-    # print(url)
+    # print(suitable_chapters_counter)
+    z = 1
+    os.makedirs("imgs", exist_ok=True)
+    for i in suitable_chapters_counter:
+        if z == 3:
+            break
+        page = f"imgs/page{i}"
+        os.makedirs(page, exist_ok=True)
+        url = f"https://mangapoisk.live/manga/{manga[1]}/chapter/1-{i}"
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        imgs = soup.find_all("img")
+        o = 0
+        for i in imgs:
+            if "pages" in i["src"]:
+                o += 1
+                img_url = i["src"]
+                response = requests.get(img_url)
+                response.raise_for_status()
+                file_extension = img_url.split(".")[-1]
+                filepath = f"{page}/img{o}.{file_extension}"
 
+                with open(filepath, 'wb') as f:
+                    f.write(response.content)
+                # print(i["src"])
+        z +=1
 
 if __name__ == "__main__":
     main()
