@@ -1,3 +1,7 @@
+import requests
+from bs4 import BeautifulSoup
+import datetime
+
 def get_correct_number(number, range=True):
     for el in number:
             if el in "1234567890":
@@ -51,12 +55,44 @@ def get_correct_sorted_chapters(user_string, chapters):
 
     return sorted_chapters
 
+def find_manga_on_page(url, text_to_find):
+    i = 9
+    found = False
+
+    while not found:
+        i += 1
+        params = {"page": i}
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        selector = "main div.grid-cols-2 .manga-card a h2"
+        cards = soup.select(selector)
+        
+        for card in cards:
+            if text_to_find in card.text:  
+                aa = card.parent
+                href = aa["href"].split("/")[-1]
+                print(card.text)
+                print(href)
+                found = True  
+                break  
+
 def main():
-    user_string = "1daf.f2,23:2,24ss:, ,0"
+    # user_string = "1daf.f2,23:2,24ss:, ,0"
     # user_string = input("Введите значения: ")
-    chapters = []
-    sorted_chapters = get_correct_sorted_chapters(user_string, chapters)
-    print(sorted_chapters)
+    # chapters = []
+    # sorted_chapters = get_correct_sorted_chapters(user_string, chapters)
+    # print(sorted_chapters)
+
+    current_time1 = datetime.datetime.now().time()
+    print(current_time1) 
+
+    url = f"https://mangapoisk.live/manga"
+    text_to_find = "Жрец порчи" 
+    find_manga_on_page(url, text_to_find)  
+
+    current_time2 = datetime.datetime.now().time()
+    print(current_time2) 
 
 if __name__ == "__main__":
     main()
