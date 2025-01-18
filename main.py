@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 
 import os
+import argparse
 
 
 def get_correct_number(number, range=True):
@@ -24,8 +25,8 @@ def is_range(number):
 
     return err == 0
 
-def breaking_range(item, all_chapters):
-    chapters_range = item.split(':')
+def breaking_range(chapter_number, all_chapters):
+    chapters_range = chapter_number.split(':')
     min, max = chapters_range
     min, max = int(min), int(max)
     if min > max:
@@ -58,20 +59,20 @@ def get_correct_sorted_chapters(user_chapters, all_chapters):
 
     return sorted_chapters
 
-def find_manga_on_page(manga_search_url, text_to_find):
-    i = 0
+def find_manga_on_page(manga_search_url, manga_title):
+    page_number = 0
     found = False
 
     while not found:
-        i += 1
-        params = {"page": i}
+        page_number += 1
+        params = {"page": page_number}
         response = requests.get(manga_search_url, params=params)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         selector = "main div.grid-cols-2 .manga-card a h2"
         cards = soup.select(selector)
         for card in cards:
-            if text_to_find in card.text:  
+            if manga_title in card.text:  
                 a = card.parent
                 manga_slug = a["href"].split("/")[-1]
                 found = True  
@@ -88,55 +89,73 @@ def find_last_chapter(url):
     return int(last_chapter)
 
 def download_images(numbers_relevant_chapters, manga_slug):
-    os.makedirs("imgs", exist_ok=True)
-    for i in numbers_relevant_chapters:
-        page = f"imgs/page{i}"
-        os.makedirs(page, exist_ok=True)
-        url = f"https://mangapoisk.live/manga/{manga_slug}/chapter/1-{i}"
-        response = requests.get(url)
+    root_folder = "imgs"
+    url = "https://mangapoisk.live/manga"
+
+    for chapter_number in numbers_relevant_chapters:
+        folder = f"page{chapter_number}"
+        page_number = f"1-{chapter_number}"
+
+        os.makedirs(os.path.join(f"{root_folder}/{folder}"), exist_ok=True)
+
+        images_url = os.path.join(f"{url}/{manga_slug}/chapter/{page_number}")
+        response = requests.get(images_url)
         response.raise_for_status()
+
         soup = BeautifulSoup(response.text, 'html.parser')
         imgs = soup.find_all("img")
-        o = 0
-        for i in imgs:
-            if "pages" in i["src"]:
-                o += 1
-                img_url = i["src"]
+
+        for ordinal, img in enumerate(imgs):
+            if "pages" in img["src"]:
+                img_url = img["src"]
+
                 response = requests.get(img_url)
                 response.raise_for_status()
-                file_extension = img_url.split(".")[-1]
-                filepath = f"{page}/img{o}.{file_extension}"
 
+                filename = f"/img{ordinal}"
+                file_extension = img_url.split(".")[-1]
+                filepath = os.path.join(f"{root_folder}/{folder}/{filename}.{file_extension}")
                 with open(filepath, 'wb') as f:
                     f.write(response.content)
 
 
 def main():
-    user_chapters = "3jsdfn.,1:9,0, ,:1:1ddad.,1sdf2."
+    parser = argparse.ArgumentParser(description="Скачивает манги и преобразует их в pdf файлы.")
+    parser.add_argument("--chapters", type=str, help="Введите главы которые необходимо скачать. Можно указывать необходимые главы через запятую, либо же указать диапазон. Пример: 1, 2, 3:10. Если оставить это значение пустым, тогда скачаются все главы.")
+    parser.add_argument("--url", type=str, help="Введите адрес страницы с мангой.")
+    parser.add_argument("--name", type=str, help="Введите название манги которую нужно скачать(этот способ будет выполняться медленнее, чем если указать адрес).")
+    args = parser.parse_args()
+
+    user_chapters = args.chapters
+    manga_page_url = args.url
+    manga_title = args.name
+    download_all_chapters = False
     all_chapters = []
-    numbers_sorted_chapters = get_correct_sorted_chapters(user_chapters, all_chapters)
-    if len(numbers_sorted_chapters) == 0:
-        print("Перепроверьте главы которые вы написали для скачивания.")
-    print(numbers_sorted_chapters)
 
-    # manga_page_url = input("Введите ссылку на страницу с мангой.")
-    # manga_page_url = "https://mangapoisk.live/manga/the-reincarnated-assassin-is-a-genius-swordsman"
-    # if manga_page_url:
-    #     manga_slug = manga_page_url.split("/")[-1]
-    # else:
-    #     manga_search_url = "https://mangapoisk.live/manga"
-    #     text_to_find = "Жрец порчи" 
-    #     manga_slug = find_manga_on_page(manga_search_url, text_to_find)  
-    #     manga_page_url = f"https://mangapoisk.live/manga/{manga_slug}"
+    if user_chapters:
+        numbers_sorted_chapters = get_correct_sorted_chapters(user_chapters, all_chapters)
+    else:
+        download_all_chapters = True
 
-    # last_chapter = find_last_chapter(manga_page_url)
+    if manga_page_url:
+        manga_slug = manga_page_url.split("/")[-1]
+    else:
+        manga_search_url = "https://mangapoisk.live/manga"
+        manga_slug = find_manga_on_page(manga_search_url, manga_title)  
+        manga_page_url = f"https://mangapoisk.live/manga/{manga_slug}"
 
-    # numbers_relevant_chapters = []
-    # for chapter_number in numbers_sorted_chapters:
-    #     if chapter_number <= last_chapter:
-    #         numbers_relevant_chapters.append(chapter_number)
+    last_chapter = find_last_chapter(manga_page_url)
 
-    # download_images(numbers_relevant_chapters, manga_slug)
+    numbers_relevant_chapters = []
+    if download_all_chapters:
+        for chapter_number in range(1, last_chapter):
+            numbers_relevant_chapters.append(chapter_number)
+    else:
+        for chapter_number in numbers_sorted_chapters:
+            if chapter_number <= last_chapter:
+                numbers_relevant_chapters.append(chapter_number)
+
+    download_images(numbers_relevant_chapters, manga_slug)
 
 if __name__ == "__main__":
     main()
