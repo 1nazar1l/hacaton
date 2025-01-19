@@ -1,5 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
+from PIL import Image
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 import os
 import argparse
@@ -88,35 +91,77 @@ def find_last_chapter(url):
     last_chapter = href.split("/")[-1].split("-")[-1]
     return int(last_chapter)
 
-def download_images(numbers_relevant_chapters, manga_slug):
+def download_images(chapter_number, manga_slug, image_paths):
     root_folder = "imgs"
     url = "https://mangapoisk.live/manga"
+    folder = f"page{chapter_number}"
+    page_number = f"1-{chapter_number}"
+    os.makedirs(os.path.join(f"{root_folder}/{folder}"), exist_ok=True)
 
-    for chapter_number in numbers_relevant_chapters:
-        folder = f"page{chapter_number}"
-        page_number = f"1-{chapter_number}"
+    images_url = os.path.join(f"{url}/{manga_slug}/chapter/{page_number}")
+    response = requests.get(images_url)
+    response.raise_for_status()
 
-        os.makedirs(os.path.join(f"{root_folder}/{folder}"), exist_ok=True)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    imgs = soup.find_all("img")
 
-        images_url = os.path.join(f"{url}/{manga_slug}/chapter/{page_number}")
-        response = requests.get(images_url)
-        response.raise_for_status()
+    for ordinal, img in enumerate(imgs):
+        if "pages" in img["src"]:
+            img_url = img["src"]
 
-        soup = BeautifulSoup(response.text, 'html.parser')
-        imgs = soup.find_all("img")
+            response = requests.get(img_url)
+            response.raise_for_status()
 
-        for ordinal, img in enumerate(imgs):
-            if "pages" in img["src"]:
-                img_url = img["src"]
+            filename = f"/img{ordinal}"
+            file_extension = img_url.split(".")[-1]
+            filepath = os.path.join(f"{root_folder}/{folder}/{filename}.{file_extension}")
+            with open(filepath, 'wb') as f:
+                f.write(response.content)
 
-                response = requests.get(img_url)
-                response.raise_for_status()
+            image_paths.append(filepath)
 
-                filename = f"/img{ordinal}"
-                file_extension = img_url.split(".")[-1]
-                filepath = os.path.join(f"{root_folder}/{folder}/{filename}.{file_extension}")
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
+def create_pdf_file(image_paths, chapter_number):
+    os.makedirs("temporary_storage", exist_ok=True)
+    os.makedirs("manga_storage", exist_ok=True)
+
+    manga_path = os.path.join("manga_storage", f"Глава{chapter_number}.pdf")
+
+    c = canvas.Canvas(manga_path, pagesize=letter)
+    page_width, page_height = letter
+    page_width, page_height = int(page_width), int(page_height)
+
+    ordinal = 1
+    number_pictures_per_cycle = 0
+    new_image_paths = []
+
+    for image_path in image_paths:
+
+        img = Image.open(image_path)
+        img_width, img_height = img.size
+        img_width, img_height = int(img_width), int(img_height)
+
+        for i in range(0, img_height, page_height):
+            number_pictures_per_cycle += 1
+
+            box = (0, i, img_width, min(i + page_height, img_height))
+            img_part = img.crop(box)
+            img_num = (i//page_height) + ordinal
+
+            temp_image_path = f'temporary_storage/temp_{img_num}.jpg'
+            new_image_paths.append(temp_image_path)
+            img_part.save(temp_image_path)
+
+        ordinal += number_pictures_per_cycle
+        
+    for image_path in new_image_paths:
+        img = Image.open(image_path)
+        img_width, img_height = img.size
+        img_width, img_height = int(img_width), int(img_height)
+
+        c.drawImage(image_path, 0, 0, width=page_width, height=page_height)
+        c.showPage()
+        
+    c.save()
 
 
 def main():
@@ -155,7 +200,11 @@ def main():
             if chapter_number <= last_chapter:
                 numbers_relevant_chapters.append(chapter_number)
 
-    download_images(numbers_relevant_chapters, manga_slug)
+    image_paths = []
+    for chapter_number in numbers_relevant_chapters:
+        download_images(chapter_number, manga_slug, image_paths)
+        create_pdf_file(image_paths, chapter_number)
+
 
 if __name__ == "__main__":
     main()
