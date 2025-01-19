@@ -1,3 +1,5 @@
 /venv
 .gitattributes
 /imgs
+/manga_storage
+/temporary_storage
