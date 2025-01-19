@@ -91,7 +91,7 @@ def find_last_chapter(url):
     last_chapter = href.split("/")[-1].split("-")[-1]
     return int(last_chapter)
 
-def download_images(chapter_number, manga_slug, image_paths):
+def get_and_download_images(chapter_number, manga_slug, image_paths):
     root_folder = "imgs"
     url = "https://mangapoisk.live/manga"
     folder = f"page{chapter_number}"
@@ -120,11 +120,12 @@ def download_images(chapter_number, manga_slug, image_paths):
 
             image_paths.append(filepath)
 
-def create_pdf_file(image_paths, chapter_number):
+def create_pdf_file(image_paths, chapter_number, manga_slug):
     os.makedirs("temporary_storage", exist_ok=True)
     os.makedirs("manga_storage", exist_ok=True)
+    os.makedirs(os.path.join("manga_storage", manga_slug), exist_ok=True)
 
-    manga_path = os.path.join("manga_storage", f"Глава{chapter_number}.pdf")
+    manga_path = os.path.join("manga_storage", manga_slug, f"Глава{chapter_number}.pdf")
 
     c = canvas.Canvas(manga_path, pagesize=letter)
     page_width, page_height = letter
@@ -171,7 +172,6 @@ def clear_temporary_storage():
     for image in image_paths:
         try:
             os.remove(image)
-            print(f'Удалено: {image}')
         except Exception as e:
             print(f'Ошибка при удалении {image}: {e}')
 
@@ -214,8 +214,8 @@ def main():
 
     image_paths = []
     for chapter_number in numbers_relevant_chapters:
-        download_images(chapter_number, manga_slug, image_paths)
-        create_pdf_file(image_paths, chapter_number)
+        get_and_download_images(chapter_number, manga_slug, image_paths)
+        create_pdf_file(image_paths, chapter_number, manga_slug)
 
     clear_temporary_storage()
 
