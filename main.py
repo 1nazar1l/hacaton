@@ -163,6 +163,18 @@ def create_pdf_file(image_paths, chapter_number):
         
     c.save()
 
+def clear_temporary_storage():
+    folder_path = 'temporary_storage'
+    image_files = [f for f in os.listdir(folder_path)]
+    image_paths = [os.path.join(folder_path, f) for f in image_files]
+
+    for image in image_paths:
+        try:
+            os.remove(image)
+            print(f'Удалено: {image}')
+        except Exception as e:
+            print(f'Ошибка при удалении {image}: {e}')
+
 
 def main():
     parser = argparse.ArgumentParser(description="Скачивает манги и преобразует их в pdf файлы.")
@@ -204,6 +216,8 @@ def main():
     for chapter_number in numbers_relevant_chapters:
         download_images(chapter_number, manga_slug, image_paths)
         create_pdf_file(image_paths, chapter_number)
+
+    clear_temporary_storage()
 
 
 if __name__ == "__main__":
